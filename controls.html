@@ -42,6 +42,7 @@
     .option input:checked + label .radio-indicator { border-color: var(--accent); }
     .radio-indicator::after { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); transform: scale(0); transition: transform 0.2s; }
     .option input:checked + label .radio-indicator::after { transform: scale(1); }
+    .thumb { width: 36px; height: 36px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--border); background: #1a1a1a; }
     .option-content { flex: 1; }
     .option-name { font-size: 0.85rem; font-weight: 500; color: var(--text); }
     .option-desc { font-size: 0.68rem; color: var(--muted); margin-top: 0.2rem; }
@@ -74,8 +75,9 @@
     input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; background: var(--accent); cursor: pointer; border-radius: 0; }
     input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; background: var(--accent); border: none; border-radius: 0; cursor: pointer; }
     .speed-val { font-size: 0.65rem; color: var(--accent); min-width: 2.5rem; text-align: right; }
-    .link-hint { margin-top: 2rem; padding: 1rem 1.2rem; border: 1px dashed var(--border); font-size: 0.68rem; color: var(--muted); line-height: 1.6; }
+    .link-hint { margin-top: 2rem; padding: 1rem 1.2rem; border: 1px dashed var(--border); font-size: 0.68rem; color: var(--muted); line-height: 1.8; }
     .link-hint strong { color: var(--accent); }
+    .link-hint code { font-family: 'DM Mono', monospace; color: #888; font-size: 0.66rem; }
   </style>
 </head>
 <body>
@@ -83,7 +85,7 @@
     <div class="header">
       <div class="label-tag">Controller</div>
       <h1>Image<br /><span>Select</span></h1>
-      <p class="sub">// choose a scene — all displays update live</p>
+      <p class="sub">// choose a card — all displays update live</p>
     </div>
 
     <div class="conn-bar">
@@ -93,12 +95,12 @@
 
     <div class="panel">
       <div class="panel-title">
-        <span>— Scene Selection</span>
+        <span>— Card Selection</span>
         <span class="drag-hint">drag to reorder</span>
       </div>
       <div class="options" id="options"></div>
       <div class="status-bar">
-        <div><span class="status-dot" id="statusDot"></span><span id="statusText">no scene selected</span></div>
+        <div><span class="status-dot" id="statusDot"></span><span id="statusText">no card selected</span></div>
         <div id="timestamp">—</div>
       </div>
     </div>
@@ -107,7 +109,7 @@
       <div class="autopan-row">
         <div class="autopan-label">
           <div class="title">Auto-Pan</div>
-          <div class="desc">Cycle through scenes in list order</div>
+          <div class="desc">Cycle through cards in list order</div>
         </div>
         <div class="toggle-wrap">
           <input type="checkbox" id="autopanToggle" class="toggle-input" />
@@ -122,19 +124,16 @@
     </div>
 
     <div class="link-hint">
-      Share <strong>display.html</strong> with other computers.<br />
-      All displays update the moment you change a scene.
+      Put your PNG files in the <strong>same folder</strong> as these HTML files.<br />
+      Edit the <code>SCENES</code> list in the &lt;script&gt; to match your filenames.<br /><br />
+      Share <strong>display.html</strong> — all screens update instantly.
     </div>
   </div>
 
-  <!-- Firebase SDK -->
   <script type="module">
-    import { initializeApp }                    from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
-    import { getDatabase, ref, set, onValue }   from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js';
+    import { initializeApp }                  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+    import { getDatabase, ref, set, onValue } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js';
 
-    // ─────────────────────────────────────────────────────────────
-    //  PASTE YOUR FIREBASE CONFIG OBJECT HERE
-    //  (Firebase console → Project Settings → Your apps → Web app)
     const firebaseConfig = {
       apiKey:            "AIzaSyC3xn9E9g42oTeoHnrQDak83UI8ZOUqIt0",
       authDomain:        "acosdnd.firebaseapp.com",
@@ -144,46 +143,39 @@
       messagingSenderId: "663447589918",
       appId:             "1:663447589918:web:7602f774ee230b135b4a0f",
     };
-    // ─────────────────────────────────────────────────────────────
 
     const app      = initializeApp(firebaseConfig);
     const db       = getDatabase(app);
     const stateRef = ref(db, 'controller/state');
 
+    // ── Connection indicator ────────────────────────────────────
     const connDot  = document.getElementById('connDot');
     const connText = document.getElementById('connText');
-
-    // Connection indicator
-    import { ref as dbRef, onValue as dbOnValue } from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js';
-    const connectedRef = dbRef(db, '.info/connected');
-    dbOnValue(connectedRef, snap => {
-      if (snap.val()) {
-        connDot.className = 'conn-dot ok';
-        connText.textContent = 'connected';
-      } else {
-        connDot.className = 'conn-dot err';
-        connText.textContent = 'disconnected';
-      }
+    onValue(ref(db, '.info/connected'), snap => {
+      if (snap.val()) { connDot.className = 'conn-dot ok';  connText.textContent = 'connected'; }
+      else            { connDot.className = 'conn-dot err'; connText.textContent = 'disconnected'; }
     });
 
-    // ── Scene data ──────────────────────────────────────────────
+    // ── SCENES — edit this list to match your PNG filenames ─────
+    // Keys can be anything (no spaces). url is relative to this HTML file.
+    // Add, remove, or rename entries freely.
     const SCENES = {
-      Stephen:   { label: 'Stephen',   desc: 'Stephen Sheet',                      url: 'https://hopewelljnj.github.io/ACOSDnD/2.png' },
-      ocean:     { label: 'Ocean',     desc: 'Coastal waves, open water',          url: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1400&q=80' },
-      forest:    { label: 'Forest',    desc: 'Dense canopy, dappled light',        url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1400&q=80' },
-      city:      { label: 'City',      desc: 'Urban skyline, architecture',        url: 'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1400&q=80' },
-      desert:    { label: 'Desert',    desc: 'Dunes, vast open sky',               url: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1400&q=80' },
-      aurora:    { label: 'Aurora',    desc: 'Northern lights, polar skies',       url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1400&q=80' },
+      card1: { label: 'Card 1', desc: 'Character card 1', url: './card1.png' },
+      card2: { label: 'Card 2', desc: 'Character card 2', url: './card2.png' },
+      card3: { label: 'Card 3', desc: 'Character card 3', url: './card3.png' },
+      card4: { label: 'Card 4', desc: 'Character card 4', url: './card4.png' },
+      card5: { label: 'Card 5', desc: 'Character card 5', url: './card5.png' },
+      card6: { label: 'Card 6', desc: 'Character card 6', url: './card6.png' },
     };
+    // ────────────────────────────────────────────────────────────
 
-    // ── In-memory state ─────────────────────────────────────────
     let order      = Object.keys(SCENES);
     let panEnabled = Object.fromEntries(order.map(k => [k, true]));
     let currentKey = null;
     let panInterval = null;
     let panIndex    = 0;
     let dragSrc     = null;
-    let ignoreRemote = false; // prevent echo when we write
+    let ignoreRemote = false;
 
     const optionsEl   = document.getElementById('options');
     const dot         = document.getElementById('statusDot');
@@ -197,39 +189,23 @@
     // ── Push state to Firebase ──────────────────────────────────
     function pushState() {
       ignoreRemote = true;
-      set(stateRef, {
-        key:        currentKey,
-        order,
-        panEnabled,
-        autoPan:    toggle.checked,
-        interval:   parseInt(speedSlider.value),
-      }).finally(() => { setTimeout(() => { ignoreRemote = false; }, 300); });
+      set(stateRef, { key: currentKey, order, panEnabled, autoPan: toggle.checked, interval: parseInt(speedSlider.value) })
+        .finally(() => setTimeout(() => { ignoreRemote = false; }, 300));
     }
 
-    // ── Load initial state from Firebase ────────────────────────
+    // ── Sync state from Firebase on first load ──────────────────
     onValue(stateRef, snap => {
       if (ignoreRemote) return;
       const state = snap.val();
       if (!state) { renderList(); return; }
-      if (state.order)      { order = state.order; }
-      if (state.panEnabled) { panEnabled = state.panEnabled; }
+      if (state.order)      order      = state.order;
+      if (state.panEnabled) panEnabled = state.panEnabled;
       if (state.interval)   { speedSlider.value = state.interval; speedVal.textContent = state.interval + 's'; }
       currentKey = state.key || null;
       renderList();
-      if (state.key) {
-        dot.classList.add('active');
-        text.textContent = `scene set → ${SCENES[state.key]?.label?.toLowerCase() ?? state.key}`;
-      }
-      if (state.autoPan && !toggle.checked) {
-        toggle.checked = true;
-        speedRow.classList.add('enabled');
-        startAutoPan();
-      } else if (!state.autoPan && toggle.checked) {
-        toggle.checked = false;
-        speedRow.classList.remove('enabled');
-        stopAutoPan();
-      }
-    }, { onlyOnce: true }); // only sync on first load; controller owns state after that
+      if (state.key) { dot.classList.add('active'); text.textContent = `card set → ${SCENES[state.key]?.label ?? state.key}`; }
+      if (state.autoPan && !toggle.checked) { toggle.checked = true; speedRow.classList.add('enabled'); startAutoPan(); }
+    }, { onlyOnce: true });
 
     // ── Render list ─────────────────────────────────────────────
     function renderList() {
@@ -246,6 +222,7 @@
           <label for="s_${key}">
             <div class="drag-handle"><span></span><span></span><span></span></div>
             <div class="radio-indicator"></div>
+            <img class="thumb" src="${s.url}" alt="${s.label}" onerror="this.style.opacity='0.2'" />
             <div class="option-content">
               <div class="option-name">${s.label}</div>
               <div class="option-desc">${s.desc}</div>
@@ -270,23 +247,14 @@
           pushState();
         });
 
-        wrap.addEventListener('dragstart', e => {
-          dragSrc = wrap; wrap.classList.add('dragging');
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', key);
-        });
-        wrap.addEventListener('dragend', () => {
-          wrap.classList.remove('dragging');
-          document.querySelectorAll('.option').forEach(el => el.classList.remove('drag-over'));
-          dragSrc = null;
-        });
+        wrap.addEventListener('dragstart', e => { dragSrc = wrap; wrap.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', key); });
+        wrap.addEventListener('dragend',   () => { wrap.classList.remove('dragging'); document.querySelectorAll('.option').forEach(el => el.classList.remove('drag-over')); dragSrc = null; });
         wrap.addEventListener('dragover',  e => { e.preventDefault(); if (dragSrc && dragSrc !== wrap) wrap.classList.add('drag-over'); });
         wrap.addEventListener('dragleave', () => wrap.classList.remove('drag-over'));
         wrap.addEventListener('drop', e => {
           e.preventDefault(); wrap.classList.remove('drag-over');
           if (!dragSrc || dragSrc === wrap) return;
-          const fi = order.indexOf(dragSrc.dataset.key);
-          const ti = order.indexOf(wrap.dataset.key);
+          const fi = order.indexOf(dragSrc.dataset.key), ti = order.indexOf(wrap.dataset.key);
           order.splice(fi, 1); order.splice(ti, 0, dragSrc.dataset.key);
           renderList();
           if (toggle.checked) { stopAutoPan(); startAutoPan(); }
@@ -299,21 +267,19 @@
 
     function panOrder() { return order.filter(k => panEnabled[k]); }
 
-    // ── Set scene ────────────────────────────────────────────────
     function setScene(key) {
       currentKey = key;
       const r = document.querySelector(`input[value="${key}"]`);
       if (r) r.checked = true;
       dot.classList.add('active');
-      text.textContent = `scene set → ${SCENES[key].label.toLowerCase()}`;
+      text.textContent = `card set → ${SCENES[key].label}`;
       tsEl.textContent = new Date().toLocaleTimeString();
       pushState();
     }
 
-    // ── Auto-pan ─────────────────────────────────────────────────
     function startAutoPan() {
       const active = panOrder();
-      if (active.length === 0) { text.textContent = 'no scenes in pan'; return; }
+      if (active.length === 0) { text.textContent = 'no cards in pan'; return; }
       const interval = parseInt(speedSlider.value) * 1000;
       panIndex = Math.max(active.indexOf(currentKey), 0);
       panIndex = (panIndex + 1) % active.length;
@@ -326,10 +292,7 @@
       }, interval);
     }
 
-    function stopAutoPan() {
-      clearInterval(panInterval);
-      panInterval = null;
-    }
+    function stopAutoPan() { clearInterval(panInterval); panInterval = null; }
 
     toggle.addEventListener('change', () => {
       if (toggle.checked) { speedRow.classList.add('enabled'); startAutoPan(); text.textContent = 'auto-pan active'; pushState(); }
@@ -341,7 +304,6 @@
       if (toggle.checked) { stopAutoPan(); startAutoPan(); }
     });
 
-    // Initial render while Firebase loads
     renderList();
   </script>
 </body>
