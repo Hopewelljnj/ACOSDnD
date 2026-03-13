@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Display</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #000; width: 100vw; height: 100vh; overflow: hidden; }
+    .img-slot {
+      position: fixed; inset: 0;
+      background-size: cover; background-position: center;
+      opacity: 0;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .img-slot.active { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- Firebase SDK -->
+  <script type="module">
+    import { initializeApp }                  from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js';
+    import { getDatabase, ref, onValue }      from 'https://www.gstatic.com/firebasejs/12.10.0/firebase-database.js';
+
+    // ─────────────────────────────────────────────────────────────
+    //  PASTE YOUR FIREBASE CONFIG OBJECT HERE
+    //  (same config as controls.html)
+    const firebaseConfig = {
+      apiKey:            "AIzaSyC3xn9E9g42oTeoHnrQDak83UI8ZOUqIt0",
+      authDomain:        "acosdnd.firebaseapp.com",
+      databaseURL:       "https://acosdnd-default-rtdb.firebaseio.com",
+      projectId:         "acosdnd",
+      storageBucket:     "acosdnd.firebasestorage.app",
+      messagingSenderId: "663447589918",
+      appId:             "1:663447589918:web:7602f774ee230b135b4a0f",
+    };
+    // ─────────────────────────────────────────────────────────────
+
+    const app      = initializeApp(firebaseConfig);
+    const db       = getDatabase(app);
+    const stateRef = ref(db, 'controller/state');
+
+    const SCENES = {
+      mountains: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1400&q=80',
+      ocean:     'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1400&q=80',
+      forest:    'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1400&q=80',
+      city:      'https://images.unsplash.com/photo-1477959858617-67f85cf4f1df?w=1400&q=80',
+      desert:    'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1400&q=80',
+      aurora:    'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1400&q=80',
+    };
+
+    // Pre-create one slot per scene
+    const slots = {};
+    Object.entries(SCENES).forEach(([key, url]) => {
+      const div = document.createElement('div');
+      div.className = 'img-slot';
+      div.style.backgroundImage = `url('${url}')`;
+      document.body.appendChild(div);
+      slots[key] = div;
+    });
+
+    let current = null;
+
+    function showScene(key) {
+      if (!key || key === current || !slots[key]) return;
+      current = key;
+      Object.entries(slots).forEach(([k, el]) => el.classList.toggle('active', k === key));
+    }
+
+    // Listen for real-time state changes from Firebase
+    onValue(stateRef, snap => {
+      const state = snap.val();
+      if (state?.key) showScene(state.key);
+    });
+  </script>
+</body>
+</html>
